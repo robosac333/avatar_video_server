@@ -1,0 +1,10 @@
+# ── Server + UI (the wrapper layer) ──────────────────────────────────────────
+# The heavy ML deps (torch, diffusers, transformers, flash-attn, etc.) are
+# installed by the model repos' own requirements.txt during setup_runpod.sh.
+# This file is only the API/UI glue, kept deliberately light.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pillow==11.1.0
+requests==2.32.3
+streamlit==1.41.1
