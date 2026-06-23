@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avatar Studio</title>
+<style>
+  /* ── Tokens ── */
+  :root {
+    --ink:       #0E0F11;
+    --surface:   #13151A;
+    --panel:     #1C1F27;
+    --border:    #2A2D38;
+    --teal:      #2ECFB2;
+    --teal-dim:  #1A7A6A;
+    --amber:     #F5A623;
+    --red:       #E05252;
+    --muted:     #6B7280;
+    --text:      #E2E4EA;
+    --text-soft: #9CA3AF;
+    --radius:    10px;
+    --mono:      'JetBrains Mono', 'Fira Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header .logo {
+    width: 32px; height: 32px;
+    background: var(--teal);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+  header .health {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-soft);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+  .dot.err { background: var(--red); }
+
+  main {
+    max-width: 780px;
+    margin: 40px auto;
+    padding: 0 24px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    margin-bottom: 16px;
+  }
+
+  /* ── Upload zones ── */
+  .uploads { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .drop-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--teal); background: #1a2e2a; }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-zone .icon { font-size: 28px; margin-bottom: 8px; }
+  .drop-zone .label { font-size: 13px; font-weight: 500; }
+  .drop-zone .sub { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
+  .drop-zone.filled { border-style: solid; border-color: var(--teal-dim); background: #152420; }
+  .drop-zone.filled .label { color: var(--teal); }
+
+  /* Preview */
+  #img-preview {
+    width: 100%; max-height: 180px; object-fit: cover;
+    border-radius: 6px; margin-top: 10px; display: none;
+  }
+  #audio-preview { width: 100%; margin-top: 10px; display: none; }
+
+  /* ── Controls ── */
+  .row { display: flex; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  label { font-size: 12px; font-weight: 500; color: var(--text-soft); }
+  select, textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  select:focus, textarea:focus { border-color: var(--teal); }
+  textarea { resize: vertical; min-height: 110px; line-height: 1.55; }
+
+  /* ── Radio pills ── */
+  .pills { display: flex; gap: 8px; }
+  .pill-opt { position: relative; }
+  .pill-opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .pill-opt label {
+    display: block;
+    padding: 7px 18px;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-soft);
+    transition: all .15s;
+    user-select: none;
+  }
+  .pill-opt input:checked + label {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: #152420;
+  }
+
+  /* ── Generate button ── */
+  #generate-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--teal);
+    color: #0A1A17;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+  }
+  #generate-btn:hover:not(:disabled) { opacity: .88; }
+  #generate-btn:active:not(:disabled) { transform: scale(.99); }
+  #generate-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Job status ── */
+  #job-panel { display: none; }
+  .status-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .status-badge {
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .badge-queued  { background: #2A2610; color: var(--amber); }
+  .badge-running { background: #1A2E2A; color: var(--teal); }
+  .badge-done    { background: #122A1F; color: #4ADE80; }
+  .badge-failed  { background: #2A1414; color: var(--red); }
+
+  .progress-bar {
+    height: 3px; background: var(--border); border-radius: 99px;
+    overflow: hidden; margin-top: 10px;
+  }
+  .progress-fill {
+    height: 100%; background: var(--teal);
+    border-radius: 99px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  /* ── Result ── */
+  #result-panel { display: none; }
+  video {
+    width: 100%; border-radius: var(--radius);
+    background: #000;
+    max-height: 480px;
+  }
+  .dl-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 14px;
+    padding: 10px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color .15s;
+  }
+  .dl-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ── Error ── */
+  .err-box {
+    background: #1E0F0F;
+    border: 1px solid #4A1E1E;
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: #F87171;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  /* ── Log ── */
+  .log-box {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-soft);
+    max-height: 140px;
+    overflow-y: auto;
+    display: none;
+  }
+  .log-box p { margin: 2px 0; }
+  .log-box p.ok  { color: var(--teal); }
+  .log-box p.err { color: var(--red); }
+
+  @media (max-width: 560px) {
+    .uploads { grid-template-columns: 1fr; }
+    .row { flex-direction: column; }
+    header { padding: 14px 16px; }
+    main { margin: 20px auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎬</div>
+  <h1>Avatar Studio</h1>
+  <div class="health">
+    <span class="dot" id="health-dot"></span>
+    <span id="health-text">Connecting…</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Uploads -->
+  <div class="card">
+    <div class="card-title">Inputs</div>
+    <div class="uploads">
+      <div class="drop-zone" id="img-zone">
+        <input type="file" id="img-input" accept="image/*">
+        <div class="icon">🖼</div>
+        <div class="label" id="img-label">Portrait image</div>
+        <div class="sub">PNG · JPG · WEBP</div>
+        <img id="img-preview" alt="preview">
+      </div>
+      <div class="drop-zone" id="aud-zone">
+        <input type="file" id="aud-input" accept="audio/*">
+        <div class="icon">🎙</div>
+        <div class="label" id="aud-label">Voiceover audio</div>
+        <div class="sub">MP3 · WAV · M4A</div>
+        <audio id="audio-preview" controls></audio>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="card">
+    <div class="card-title">Settings</div>
+    <div class="row" style="margin-bottom:16px">
+      <div class="field">
+        <label>Model</label>
+        <select id="model-sel">
+          <option value="hunyuan">HunyuanVideo-Avatar — high fidelity</option>
+          <option value="multitalk">Wan 2.1 MultiTalk — faster</option>
+        </select>
+      </div>
+      <div class="field" style="flex:0 0 auto">
+        <label>Resolution</label>
+        <div class="pills">
+          <div class="pill-opt">
+            <input type="radio" name="res" id="r480" value="480" checked>
+            <label for="r480">480p</label>
+          </div>
+          <div class="pill-opt">
+            <input type="radio" name="res" id="r720" value="720">
+            <label for="r720">720p</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Motion &amp; expression prompt</label>
+      <textarea id="prompt-inp">Smiling confidently, she speaks into the microphone, looking directly at the camera. Natural head and hand movements, occasional slight nod, warm smile maintained throughout with professional, engaged presenter energy. At moments of emphasis, brighten facial expression visibly — wider smile, raised eyebrows, eyes brightening and widening with enthusiasm.</textarea>
+    </div>
+  </div>
+
+  <!-- Generate -->
+  <button id="generate-btn" disabled>Select an image and audio to generate</button>
+
+  <!-- Status -->
+  <div class="card" id="job-panel">
+    <div class="card-title">Job</div>
+    <div class="status-row">
+      <span class="status-badge" id="status-badge">—</span>
+      <span id="status-text">Waiting…</span>
+      <span id="elapsed" style="margin-left:auto;font-size:12px;color:var(--text-soft)"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="log-box" id="log-box"></div>
+    <div class="err-box" id="err-box"></div>
+  </div>
+
+  <!-- Result -->
+  <div class="card" id="result-panel">
+    <div class="card-title">Result</div>
+    <video id="result-video" controls playsinline></video>
+    <br>
+    <a class="dl-btn" id="dl-link" download="reel.mp4">⬇ Download mp4</a>
+  </div>
+
+</main>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+// Auto-detect: if opened via RunPod proxy the API is on port 8000 same host
+const API = (() => {
+  const h = location.hostname;
+  // RunPod proxy pattern: PODID-PORT.proxy.runpod.net
+  if (h.includes('.proxy.runpod.net')) {
+    return location.origin.replace('-8501', '-8000');
+  }
+  return 'http://localhost:8000';
+})();
+
+// ── Health check ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/healthz`, {signal: AbortSignal.timeout(5000)});
+    const d = await r.json();
+    const ok = d.status === 'ok';
+    document.getElementById('health-dot').className = 'dot ' + (ok ? 'ok' : 'err');
+    const installed = Object.entries(d.models_installed || {})
+      .filter(([,v]) => v).map(([k]) => k).join(', ') || 'none';
+    document.getElementById('health-text').textContent =
+      ok ? `API live · ${installed} ready · queue ${d.queue_depth}` : 'API error';
+  } catch {
+    document.getElementById('health-dot').className = 'dot err';
+    document.getElementById('health-text').textContent = 'API unreachable';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 15000);
+
+// ── File handling ─────────────────────────────────────────────────────────────
+let imgFile = null, audFile = null;
+
+function setupDrop(zoneId, inputId, labelId, onFile) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const label = document.getElementById(labelId);
+  input.addEventListener('change', () => { if (input.files[0]) onFile(input.files[0]); });
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+  });
+}
+
+setupDrop('img-zone', 'img-input', 'img-label', f => {
+  imgFile = f;
+  const zone = document.getElementById('img-zone');
+  zone.classList.add('filled');
+  document.getElementById('img-label').textContent = f.name;
+  const prev = document.getElementById('img-preview');
+  prev.src = URL.createObjectURL(f);
+  prev.style.display = 'block';
+  updateBtn();
+});
+
+setupDrop('aud-zone', 'aud-input', 'aud-label', f => {
+  audFile = f;
+  const zone = document.getElementById('aud-zone');
+  zone.classList.add('filled');
+  document.getElementById('aud-label').textContent = f.name;
+  const prev = document.getElementById('audio-preview');
+  prev.src = URL.createObjectURL(f);
+  prev.style.display = 'block';
+  updateBtn();
+});
+
+function updateBtn() {
+  const btn = document.getElementById('generate-btn');
+  if (imgFile && audFile) {
+    btn.disabled = false;
+    btn.textContent = 'Generate video';
+  } else {
+    btn.disabled = true;
+    btn.textContent = 'Select an image and audio to generate';
+  }
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+document.getElementById('generate-btn').addEventListener('click', async () => {
+  const model  = document.getElementById('model-sel').value;
+  const res    = document.querySelector('input[name="res"]:checked').value;
+  const prompt = document.getElementById('prompt-inp').value;
+
+  const fd = new FormData();
+  fd.append('image',  imgFile, imgFile.name);
+  fd.append('audio',  audFile, audFile.name);
+  fd.append('prompt', prompt);
+  fd.append('model',  model);
+  fd.append('resolution', res);
+
+  // Reset UI
+  document.getElementById('job-panel').style.display    = 'block';
+  document.getElementById('result-panel').style.display = 'none';
+  document.getElementById('err-box').style.display      = 'none';
+  document.getElementById('log-box').style.display      = 'none';
+  document.getElementById('log-box').innerHTML          = '';
+  document.getElementById('generate-btn').disabled      = true;
+  document.getElementById('generate-btn').textContent   = 'Submitting…';
+  setStatus('queued', 'Submitting job…', 5);
+
+  let jobId;
+  try {
+    const r = await fetch(`${API}/generate`, {method:'POST', body: fd});
+    if (!r.ok) throw new Error(`Server error ${r.status}: ${await r.text()}`);
+    const d = await r.json();
+    jobId = d.job_id;
+    log(`Job ${jobId} queued · audio ${d.audio_seconds}s · queue position ${d.queue_position}`, 'ok');
+  } catch(e) {
+    showError(e.message);
+    resetBtn(); return;
+  }
+
+  // Poll
+  const t0 = Date.now();
+  const timer = setInterval(async () => {
+    try {
+      const r = await fetch(`${API}/status/${jobId}`);
+      const s = await r.json();
+      const elapsed = Math.round((Date.now()-t0)/1000);
+      document.getElementById('elapsed').textContent = `${elapsed}s`;
+
+      if (s.status === 'queued') {
+        setStatus('queued', 'Waiting in queue…', 8);
+      } else if (s.status === 'running') {
+        const pct = Math.min(90, 10 + elapsed * 0.6);
+        setStatus('running', 'Rendering video on GPU…', pct);
+        log(`Rendering… ${elapsed}s elapsed`);
+      } else if (s.status === 'done') {
+        clearInterval(timer);
+        setStatus('done', `Done in ${s.duration_s}s`, 100);
+        log(`Completed in ${s.duration_s}s`, 'ok');
+        await showResult(jobId);
+        resetBtn();
+      } else if (s.status === 'failed') {
+        clearInterval(timer);
+        setStatus('failed', 'Render failed', 100);
+        showError(s.error || 'Unknown error');
+        resetBtn();
+      }
+    } catch(e) {
+      log(`Poll error: ${e.message}`, 'err');
+    }
+  }, 3000);
+});
+
+async function showResult(jobId) {
+  const url = `${API}/result/${jobId}`;
+  const blob = await (await fetch(url)).blob();
+  const src  = URL.createObjectURL(blob);
+  document.getElementById('result-video').src = src;
+  document.getElementById('dl-link').href = src;
+  document.getElementById('result-panel').style.display = 'block';
+  document.getElementById('result-video').play();
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setStatus(state, text, pct) {
+  const badge = document.getElementById('status-badge');
+  badge.className = 'status-badge badge-' + state;
+  badge.textContent = state;
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+function log(msg, cls) {
+  const box = document.getElementById('log-box');
+  box.style.display = 'block';
+  const p = document.createElement('p');
+  if (cls) p.className = cls;
+  p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(p);
+  box.scrollTop = box.scrollHeight;
+}
+
+function showError(msg) {
+  const box = document.getElementById('err-box');
+  box.style.display = 'block';
+  box.textContent = msg;
+}
+
+function resetBtn() {
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = false;
+  btn.textContent = 'Generate video';
+}
+</script>
+</body>
+</html>
