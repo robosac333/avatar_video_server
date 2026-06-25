@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 # ═════════════════════════════════════════════════════════════════════════════
-# CLEAN venv-based setup for HunyuanVideo-Avatar on a single-GPU RunPod pod.
+# Clean venv-based setup for HunyuanVideo-Avatar — single GPU RunPod pod.
 #
-# Why a venv: the RunPod base image ships its own transformers/huggingface-hub/
-# diffusers that fight with the exact versions Hunyuan needs. A virtualenv gives
-# Hunyuan its own isolated packages so nothing conflicts with the system. This
-# is the robust fix for the dependency errors hit on the bare system.
+# Uses the repo's own requirements.txt as the base, then applies one targeted
+# patch to fix a known conflict between diffusers==0.33.0 and transformers>=4.50
+# (FLAX_WEIGHTS_NAME was removed from transformers but diffusers still imports it).
 #
-# The venv lives on the NETWORK VOLUME (/workspace/hunyuan-venv), so it SURVIVES
-# pod restarts — you only run this heavy install once.
-#
-# Versions are Tencent's own tested set: transformers 4.41.2 + diffusers 0.33.0.
+# The venv lives on the NETWORK VOLUME so it survives pod restarts.
+# Run this ONCE. Subsequent starts just call launch_ui.sh.
 #
 # Usage:  bash setup_hunyuan_venv.sh
 # ═════════════════════════════════════════════════════════════════════════════
@@ -22,24 +19,25 @@ REPO="$WORKSPACE/repos/HunyuanVideo-Avatar"
 VENV="$WORKSPACE/hunyuan-venv"
 
 echo "════════════════════════════════════════════════════════"
-echo "  HunyuanVideo-Avatar — clean venv setup"
+echo "  HunyuanVideo-Avatar — venv setup"
 echo "════════════════════════════════════════════════════════"
 
 # ── 0. Weights must already be on the volume ─────────────────────────────────
 CKPT="$MODELS/ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states_fp8.pt"
 if [ ! -f "$CKPT" ]; then
   echo "✗ Weights not found at: $CKPT"
-  echo "  Download first: hf download tencent/HunyuanVideo-Avatar --local-dir $MODELS"
+  echo "  Run: hf download tencent/HunyuanVideo-Avatar --local-dir $MODELS"
   exit 1
 fi
-echo "✓ Weights found on volume"
+echo "✓ Weights found"
 
-# ── 1. System deps (these are fine to touch — not Python) ────────────────────
-echo "==> Installing ffmpeg + git + python venv tooling"
-apt-get update -qq && apt-get install -y -qq ffmpeg git git-lfs python3-venv python3-pip >/dev/null 2>&1
+# ── 1. System deps ───────────────────────────────────────────────────────────
+echo "==> System deps"
+apt-get update -qq && apt-get install -y -qq \
+    ffmpeg git git-lfs python3-venv python3-pip >/dev/null 2>&1
 git lfs install >/dev/null 2>&1 || true
 
-# ── 2. Clone the repo ────────────────────────────────────────────────────────
+# ── 2. Clone repo ────────────────────────────────────────────────────────────
 mkdir -p "$WORKSPACE/repos"
 if [ ! -d "$REPO" ]; then
   echo "==> Cloning HunyuanVideo-Avatar"
@@ -48,59 +46,59 @@ else
   echo "✓ Repo already cloned"
 fi
 
-# ── 3. Create the isolated venv on the volume ────────────────────────────────
-# --system-site-packages lets the venv SEE the base image's CUDA-built torch
-# (so we don't re-download 3GB of GPU torch) while still installing our OWN
-# transformers/diffusers ON TOP, isolated from the system ones.
+# ── 3. Create venv on the volume (survives pod restarts) ─────────────────────
+# --system-site-packages reuses the base image's CUDA-compiled torch
+# so we don't re-download 3GB of GPU wheels.
 if [ ! -d "$VENV" ]; then
-  echo "==> Creating venv at $VENV (inherits system torch)"
+  echo "==> Creating venv at $VENV"
   python3 -m venv --system-site-packages "$VENV"
 else
-  echo "✓ venv already exists"
+  echo "✓ venv exists"
 fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 echo "✓ venv active: $(which python3)"
+pip install --quiet --upgrade pip
 
-python3 -m pip install --quiet --upgrade pip
+# ── 4. Install repo's own requirements (the ground truth) ────────────────────
+echo "==> Installing repo requirements (this takes a few minutes)"
+pip install --quiet -r "$REPO/requirements.txt"
 
-# ── 4. Install Hunyuan's exact tested deps INTO the venv ─────────────────────
-echo "==> Installing repo requirements into venv"
-pip install --quiet -r "$REPO/requirements.txt" || true
+# ── 5. Patch the ONE known conflict ──────────────────────────────────────────
+# diffusers==0.33.0 still imports FLAX_WEIGHTS_NAME from transformers.utils,
+# but transformers>=4.50 removed it. We add it back inside the venv only —
+# no system files are touched.
+echo "==> Patching FLAX_WEIGHTS_NAME into venv transformers"
+python3 -c "
+import transformers.utils as tu
+if not hasattr(tu, 'FLAX_WEIGHTS_NAME'):
+    with open(tu.__file__, 'a') as f:
+        f.write('\nFLAX_WEIGHTS_NAME = \"flax_model.msgpack\"\n')
+    print('   patched')
+else:
+    print('   already present — no action needed')
+"
 
-echo "==> Pinning Tencent's tested versions (transformers 4.41.2 / diffusers 0.33.0)"
-pip install --quiet \
-    "transformers==4.41.2" \
-    "diffusers==0.33.0" \
-    "huggingface-hub>=0.23,<0.25" \
-    "tokenizers>=0.19,<0.20" \
-    "gradio==3.39.0" \
-    flask loguru
-
-# FlashAttention — optional speedup; never blocks the run
-pip install --quiet ninja 2>/dev/null || true
-pip install --quiet flash-attn --no-build-isolation 2>/dev/null \
-    || echo "   (flash-attn skipped — model still runs)"
-
-# ── 5. Link weights into the repo ────────────────────────────────────────────
-echo "==> Linking weights into repo"
+# ── 6. Link weights into the repo ────────────────────────────────────────────
+echo "==> Linking weights"
 mkdir -p "$REPO/weights"
 rm -rf "$REPO/weights/ckpts"
-ln -s "$MODELS/ckpts" "$REPO/weights/ckpts"
+ln -sf "$MODELS/ckpts" "$REPO/weights/ckpts"
 if [ -f "$REPO/weights/ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states_fp8.pt" ]; then
   echo "✓ Weights linked"
 else
   echo "✗ Weight link failed"; exit 1
 fi
 
-# ── 6. Verify the imports that previously failed ─────────────────────────────
-echo "==> Verifying imports inside venv"
-python3 -c "from diffusers.hooks import apply_group_offloading; print('✓ diffusers.hooks OK')"
-python3 -c "import transformers; print('✓ transformers', transformers.__version__)"
-python3 -c "import torch; print('✓ torch', torch.__version__, '| CUDA', torch.cuda.is_available())"
+# ── 7. Verify every import that previously failed ────────────────────────────
+echo "==> Verifying imports"
+python3 -c "from diffusers.hooks import apply_group_offloading; print('✓ diffusers.hooks')"
+python3 -c "from transformers.utils import FLAX_WEIGHTS_NAME; print('✓ FLAX_WEIGHTS_NAME')"
+python3 -c "import torch; print('✓ torch', torch.__version__, '| CUDA:', torch.cuda.is_available())"
+python3 -c "import gradio; print('✓ gradio', gradio.__version__)"
 
 echo ""
 echo "════════════════════════════════════════════════════════"
-echo "  ✓ Clean setup complete. venv: $VENV"
-echo "  Launch the UI with:  bash $WORKSPACE/launch_ui.sh"
+echo "  ✓ Setup complete."
+echo "  Launch:  bash $WORKSPACE/launch_ui.sh"
 echo "════════════════════════════════════════════════════════"
