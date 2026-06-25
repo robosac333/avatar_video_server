@@ -63,9 +63,9 @@ echo "✓ venv active: $(which python3)"
 pip install --quiet --upgrade pip wheel setuptools
 
 # ── 4. Install the torch stack FIRST, matched to the pod's CUDA 12.4 ─────────
-echo "==> Installing PyTorch (CUDA 12.4 build) — a few minutes"
-pip install --quiet torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
-    --index-url https://download.pytorch.org/whl/cu124
+# echo "==> Installing PyTorch (CUDA 12.4 build) — a few minutes"
+# pip install --quiet torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
+#     --index-url https://download.pytorch.org/whl/cu124
 
 # ── 5. Install a KNOWN-GOOD huggingface_hub BEFORE transformers ──────────────
 # This is the version the repo's transformers expects; installing it first
