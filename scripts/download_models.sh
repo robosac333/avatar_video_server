@@ -26,11 +26,11 @@ dl () {  # dl <repo_id> <local_dir>
 
 # ── MultiTalk stack (3 pieces) ───────────────────────────────────────────────
 # 1) Wan 2.1 image-to-video base (the diffusion backbone)
-dl "Wan-AI/Wan2.1-I2V-14B-480P"            "Wan2.1-I2V-14B-480P"
-# 2) Audio encoder MultiTalk uses to read speech
-dl "TencentGameMate/chinese-wav2vec2-base" "chinese-wav2vec2-base"
-# 3) The MultiTalk weights themselves (the audio->motion adapter)
-dl "MeiGen-AI/MeiGen-MultiTalk"            "MeiGen-MultiTalk"
+# dl "Wan-AI/Wan2.1-I2V-14B-480P"            "Wan2.1-I2V-14B-480P"
+# # 2) Audio encoder MultiTalk uses to read speech
+# dl "TencentGameMate/chinese-wav2vec2-base" "chinese-wav2vec2-base"
+# # 3) The MultiTalk weights themselves (the audio->motion adapter)
+# dl "MeiGen-AI/MeiGen-MultiTalk"            "MeiGen-MultiTalk"
 
 # ── HunyuanVideo-Avatar (single repo, large) ─────────────────────────────────
 dl "tencent/HunyuanVideo-Avatar"          "HunyuanVideo-Avatar"
