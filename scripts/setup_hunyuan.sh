@@ -60,7 +60,7 @@ python3 -m venv "$VENV"
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 echo "✓ venv active: $(which python3)"
-pip install --quiet --upgrade pip wheel setuptools
+pip install --upgrade pip wheel setuptools
 
 # ── 4. Install the torch stack FIRST, matched to the pod's CUDA 12.4 ─────────
 # echo "==> Installing PyTorch (CUDA 12.4 build) — a few minutes"
@@ -71,17 +71,17 @@ pip install --quiet --upgrade pip wheel setuptools
 # This is the version the repo's transformers expects; installing it first
 # prevents the broken inherited one from ever being imported.
 echo "==> Installing huggingface_hub 0.24.7"
-pip install --quiet "huggingface-hub==0.24.7"
+pip install "huggingface-hub==0.24.7"
 
 # ── 6. Install the repo's own requirements (ground truth) ────────────────────
 echo "==> Installing repo requirements"
-pip install --quiet -r "$REPO/requirements.txt"
+pip install -r "$REPO/requirements.txt"
 
 # ── 7. Re-pin the deps that the repo's loose constraints can drift on ────────
 # requirements.txt says transformers>=4.50 + diffusers==0.33.0, which conflict
 # on FLAX_WEIGHTS_NAME. We pin a known-compatible pair and re-assert hub.
 echo "==> Pinning compatible transformers / diffusers / hub"
-pip install --quiet \
+pip install \
     "transformers==4.50.0" \
     "diffusers==0.33.0" \
     "huggingface-hub==0.24.7" \
@@ -101,8 +101,8 @@ PY
 
 # ── 9. FlashAttention (optional speedup; never blocks) ───────────────────────
 echo "==> FlashAttention (optional)"
-pip install --quiet ninja 2>/dev/null || true
-pip install --quiet flash-attn --no-build-isolation 2>/dev/null \
+pip install ninja 2>/dev/null || true
+pip install flash-attn --no-build-isolation 2>/dev/null \
     || echo "   (skipped — model still runs without it)"
 
 # ── 10. Link weights into the repo ───────────────────────────────────────────
