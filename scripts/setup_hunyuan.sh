@@ -51,16 +51,16 @@ fi
 
 # ── 3. Build a FRESH, ISOLATED venv (no system-site-packages) ────────────────
 # We deliberately do NOT inherit system packages — that's what kept breaking us.
-if [ -d "$VENV" ]; then
-  echo "==> Removing old venv for a clean build"
-  rm -rf "$VENV"
-fi
-echo "==> Creating isolated venv at $VENV"
-python3 -m venv "$VENV"
+# if [ -d "$VENV" ]; then
+#   echo "==> Removing old venv for a clean build"
+#   rm -rf "$VENV"
+# fi
+# echo "==> Creating isolated venv at $VENV"
+# python3 -m venv "$VENV"
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 echo "✓ venv active: $(which python3)"
-pip install --upgrade pip wheel setuptools
+# pip install --upgrade pip wheel setuptools
 
 # ── 4. Install the torch stack FIRST, matched to the pod's CUDA 12.4 ─────────
 # echo "==> Installing PyTorch (CUDA 12.4 build) — a few minutes"
@@ -70,10 +70,10 @@ pip install --upgrade pip wheel setuptools
 # ── 5. Install a KNOWN-GOOD huggingface_hub BEFORE transformers ──────────────
 # This is the version the repo's transformers expects; installing it first
 # prevents the broken inherited one from ever being imported.
-echo "==> Installing huggingface_hub 0.24.7"
-pip install "huggingface-hub==0.24.7"
+# echo "==> Installing huggingface_hub 0.24.7"
+# pip install "huggingface-hub==0.24.7"
 
-# ── 6. Install the repo's own requirements (ground truth) ────────────────────
+# # ── 6. Install the repo's own requirements (ground truth) ────────────────────
 echo "==> Installing repo requirements"
 pip install -r "$REPO/requirements.txt"
 
